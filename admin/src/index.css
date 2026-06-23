@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --gold: #C89B3C;
+    --gold-light: #D4AE5A;
+    --dark: #111111;
+    --surface: #1B1B1B;
+    --off-white: #F7F5F2;
+    --accent: #7A5C2E;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background-color: #111111;
+    color: #F7F5F2;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  #root { height: 100vh; overflow: hidden; }
+
+  ::selection { background: rgba(200,155,60,0.2); color: #F7F5F2; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(200,155,60,0.3); }
+}
+
+@layer components {
+  /* Gold gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, #C89B3C 0%, #D4AE5A 50%, #9A7628 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass effect */
+  .glass {
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Sidebar navigation link */
+  .nav-link {
+    @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl
+           font-body text-sm text-off-white/40
+           transition-colors duration-150
+           hover:text-off-white/80 hover:bg-white/[0.04];
+  }
+
+  .nav-link.active {
+    @apply text-gold;
+  }
+
+  /* Dashboard stat card */
+  .stat-card {
+    @apply bg-surface border border-white/[0.05] rounded-2xl p-5
+           transition-all duration-300 cursor-default
+           hover:border-gold/15 hover:-translate-y-0.5;
+  }
+
+  /* Data table */
+  .table-container {
+    @apply w-full overflow-x-auto no-scrollbar;
+  }
+
+  table.premium {
+    @apply w-full border-collapse;
+  }
+
+  table.premium thead th {
+    @apply text-left text-off-white/30 font-body text-xs font-medium
+           uppercase tracking-widest px-4 py-3
+           border-b border-white/[0.05];
+  }
+
+  table.premium tbody tr {
+    @apply border-b border-white/[0.04] transition-colors duration-100
+           hover:bg-white/[0.025];
+  }
+
+  table.premium tbody td {
+    @apply px-4 py-3.5 font-body text-sm text-off-white/70;
+  }
+
+  /* Status badge */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+           font-body text-xs font-medium;
+  }
+
+  .badge-pending  { @apply bg-amber-500/10 text-amber-400; }
+  .badge-preparing { @apply bg-blue-500/10 text-blue-400; }
+  .badge-ready    { @apply bg-emerald-500/10 text-emerald-400; }
+  .badge-served   { @apply bg-white/[0.06] text-off-white/40; }
+  .badge-cancelled { @apply bg-red-500/10 text-red-400; }
+  .badge-confirmed { @apply bg-emerald-500/10 text-emerald-400; }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-gold text-dark font-body font-semibold text-sm
+           px-4 py-2 rounded-xl
+           transition-all duration-200
+           hover:bg-gold-light hover:shadow-glow
+           active:scale-[0.97];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           text-off-white/50 font-body text-sm
+           px-4 py-2 rounded-xl
+           transition-all duration-150
+           hover:text-off-white hover:bg-white/[0.05]
+           active:scale-[0.97];
+  }
+
+  .btn-icon {
+    @apply w-9 h-9 flex items-center justify-center rounded-xl
+           text-off-white/40 transition-all duration-150
+           hover:text-off-white hover:bg-white/[0.06]
+           active:scale-[0.95];
+  }
+
+  /* Input */
+  .input {
+    @apply bg-surface-2 border border-white/[0.06] text-off-white
+           rounded-xl px-3.5 py-2.5 font-body text-sm
+           placeholder-off-white/20
+           transition-all duration-150
+           focus:outline-none focus:border-gold/40 focus:bg-surface-3;
+  }
+
+  /* Shimmer skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, #1B1B1B 25%, #252525 50%, #1B1B1B 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+    border-radius: 8px;
+  }
+
+  /* Chart tooltip */
+  .recharts-tooltip-wrapper { outline: none !important; }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
