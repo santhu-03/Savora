@@ -1,174 +1,359 @@
-import { Order, IOrderDocument } from '../models/Order.model';
-import { MenuItem } from '../models/MenuItem.model';
-import { Table } from '../models/Table.model';
-import { LoyaltyPoints } from '../models/LoyaltyPoints.model';
-import { Notification } from '../models/Notification.model';
+import mongoose from 'mongoose';
+import { Order, IOrderDocument, OrderStatus, PaymentMethod, ItemStatus } from '../models/Order';
+import { MenuItem } from '../models/MenuItem';
+import { Restaurant } from '../models/Restaurant';
+import { Payment } from '../models/Payment';
+import { User } from '../models/User';
 import { AppError } from '../middleware/errorHandler';
 import { cache } from '../config/redis';
-import { parsePagination, buildMeta } from '../utils/pagination';
-import { PaginatedResult } from '../types';
+import { getStripe } from '../config/stripe';
 import { getIO } from '../config/socket';
+import { sendMail, emailTemplates } from '../utils/email';
+import { parsePagination, buildMeta } from '../utils/pagination';
 import { logger } from '../utils/logger';
 
-const POINTS_PER_RUPEE = 1;
+// ─── Types ────────────────────────────────────────────────────
+export interface CreateOrderInput {
+  restaurantId: string;
+  customerId?: string;
+  tableId?: string;
+  type: 'dine-in' | 'takeaway' | 'delivery';
+  items: Array<{
+    menuItemId: string;
+    quantity: number;
+    modifiers?: Array<{ name: string; value: string; price: number }>;
+    specialInstructions?: string;
+  }>;
+  paymentMethod?: PaymentMethod;
+  deliveryAddress?: {
+    street: string;
+    city: string;
+    lat?: number;
+    lng?: number;
+    instructions?: string;
+  };
+  deliveryFee?: number;
+  notes?: string;
+}
 
-export class OrderService {
-  // ─── Create order ────────────────────────────────────────────
-  static async create(data: {
-    restaurantId: string;
-    customerId?: string;
-    guestInfo?: { name: string; email?: string; phone?: string };
-    tableId?: string;
-    reservationId?: string;
-    type: string;
-    items: Array<{ menuItemId: string; quantity: number; notes?: string; modifications?: unknown[] }>;
-    notes?: string;
-  }) {
-    // Validate and price items
-    const priced = await Promise.all(
-      data.items.map(async item => {
-        const mi = await MenuItem.findById(item.menuItemId);
-        if (!mi) throw new AppError(`Menu item ${item.menuItemId} not found`, 404);
-        if (!mi.isAvailable) throw new AppError(`${mi.name} is not available`, 400);
-        const unitPrice = mi.discountedPrice ?? mi.basePrice;
-        return {
-          menuItem: mi._id,
-          name: mi.name,
-          quantity: item.quantity,
-          unitPrice,
-          totalPrice: unitPrice * item.quantity,
-          modifications: (item.modifications ?? []) as any[],
-          notes: item.notes,
-          status: 'pending' as const,
-        };
-      })
-    );
+// ─── Status transition map ────────────────────────────────────
+const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['preparing', 'cancelled'],
+  preparing: ['ready'],
+  ready: ['out_for_delivery', 'delivered'],
+  out_for_delivery: ['delivered'],
+};
 
-    const subtotal = priced.reduce((s, i) => s + i.totalPrice, 0);
-    const taxAmount = subtotal * 0.05;
-    const serviceCharge = subtotal * 0.1;
-    const total = subtotal + taxAmount + serviceCharge;
+// ─── Create order ─────────────────────────────────────────────
+export async function createOrder(input: CreateOrderInput): Promise<IOrderDocument> {
+  const restaurant = await Restaurant.findById(input.restaurantId).select('settings name');
+  if (!restaurant) throw new AppError('Restaurant not found', 404);
 
-    const order = await Order.create({
-      restaurant: data.restaurantId,
-      customer: data.customerId,
-      guestInfo: data.guestInfo,
-      table: data.tableId,
-      reservation: data.reservationId,
-      items: priced,
-      type: data.type,
-      subtotal,
-      taxAmount,
-      serviceCharge,
-      total,
-      notes: data.notes,
-    });
+  // Price each item from current menu
+  const pricedItems = await Promise.all(
+    input.items.map(async ({ menuItemId, quantity, modifiers = [], specialInstructions }) => {
+      const mi = await MenuItem.findOne({ _id: menuItemId, restaurantId: input.restaurantId });
+      if (!mi) throw new AppError(`Menu item ${menuItemId} not found`, 404);
+      if (!mi.isAvailable) throw new AppError(`${mi.name} is currently unavailable`, 400);
 
-    // Update table status
-    if (data.tableId) {
-      await Table.findByIdAndUpdate(data.tableId, {
-        status: 'occupied',
-        currentOrder: order._id,
-        lastStatusChange: new Date(),
-      });
-      getIO()?.to('tables').emit('tableStatusChanged', { tableId: data.tableId, status: 'occupied' });
-    }
+      const basePrice = mi.discountPrice ?? mi.price;
+      const modifierTotal = modifiers.reduce((s, m) => s + m.price, 0);
+      const unitPrice = Math.round((basePrice + modifierTotal) * 100) / 100;
 
-    // Broadcast to kitchen
-    getIO()?.to('kitchen').emit('newOrder', order);
+      return {
+        menuItemId: mi._id as mongoose.Types.ObjectId,
+        name: mi.name,
+        price: unitPrice,
+        quantity,
+        modifiers,
+        specialInstructions,
+        status: 'pending' as ItemStatus,
+      };
+    })
+  );
 
-    // Invalidate cache
-    await cache.delPattern(`orders:${data.restaurantId}:*`);
+  // Calculate totals
+  const subtotal = Math.round(pricedItems.reduce((s, i) => s + i.price * i.quantity, 0) * 100) / 100;
+  const taxRate = (restaurant.settings?.taxRate ?? 5) / 100;
+  const scRate = (restaurant.settings?.serviceCharge ?? 10) / 100;
+  const tax = Math.round(subtotal * taxRate * 100) / 100;
+  const serviceCharge = Math.round(subtotal * scRate * 100) / 100;
+  const deliveryFee = input.type === 'delivery' ? (input.deliveryFee ?? 0) : 0;
+  const total = Math.round((subtotal + tax + serviceCharge + deliveryFee) * 100) / 100;
 
-    return order;
-  }
+  // Save order (orderNumber auto-generated by pre-save hook)
+  const order = await Order.create({
+    restaurantId: input.restaurantId,
+    customerId: input.customerId,
+    tableId: input.tableId,
+    type: input.type,
+    items: pricedItems,
+    paymentMethod: input.paymentMethod,
+    subtotal,
+    tax,
+    serviceCharge,
+    deliveryFee,
+    discount: 0,
+    total,
+    deliveryAddress: input.deliveryAddress,
+    notes: input.notes,
+  });
 
-  // ─── Update status ───────────────────────────────────────────
-  static async updateStatus(orderId: string, status: string, userId: string) {
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError('Order not found', 404);
-
-    const prev = order.status;
-    order.status = status as any;
-
-    const now = new Date();
-    const timestamps: Record<string, Date> = {
-      confirmed: order.confirmedAt = now,
-      preparing: order.preparingAt = now,
-      ready: order.readyAt = now,
-      completed: order.completedAt = now,
-      cancelled: order.cancelledAt = now,
-    };
-
-    if (status === 'completed' && order.customer) {
-      const earned = Math.floor(order.total * POINTS_PER_RUPEE);
-      order.loyaltyPointsEarned = earned;
-      await LoyaltyPoints.findOneAndUpdate(
-        { customer: order.customer, restaurant: order.restaurant },
-        {
-          $inc: { currentPoints: earned, lifetimePoints: earned },
-          $push: { transactions: { type: 'earn', points: earned, orderId: order._id, description: `Order ${order.orderNumber}`, createdAt: new Date() } },
+  // Create Stripe PaymentIntent for card payments
+  if (input.paymentMethod === 'card') {
+    try {
+      const intent = await getStripe().paymentIntents.create({
+        amount: Math.round(total * 100),
+        currency: 'inr',
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+          restaurantId: input.restaurantId,
         },
-        { upsert: true }
-      );
+      });
+
+      await Promise.all([
+        Order.findByIdAndUpdate(order._id, { stripePaymentIntentId: intent.id }),
+        Payment.create({
+          orderId: order._id,
+          restaurantId: input.restaurantId,
+          customerId: input.customerId,
+          amount: total,
+          currency: 'INR',
+          method: 'card',
+          stripePaymentIntentId: intent.id,
+          status: 'processing',
+        }),
+      ]);
+
+      (order as any).stripePaymentIntentId = intent.id;
+      (order as any).clientSecret = intent.client_secret;
+    } catch (err) {
+      logger.error('Stripe PaymentIntent creation failed', { err, orderId: order._id });
     }
-
-    if (status === 'completed' || status === 'cancelled') {
-      await Table.findByIdAndUpdate(order.table, { status: 'cleaning', currentOrder: null, lastStatusChange: now });
-      getIO()?.to('tables').emit('tableStatusChanged', { tableId: order.table, status: 'cleaning' });
-    }
-
-    await order.save();
-
-    getIO()?.to('kitchen').to('waitstaff').emit('orderStatusChanged', { orderId, status, prev });
-    await cache.delPattern(`orders:${order.restaurant}:*`);
-
-    logger.info('Order status updated', { orderId, prev, status, userId });
-    return order;
   }
 
-  // ─── Find by restaurant ───────────────────────────────────────
+  // Socket events
+  const io = getIO();
+  const orderPayload = {
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    type: order.type,
+    total,
+    itemCount: pricedItems.length,
+  };
+  io?.to(`restaurant:${input.restaurantId}`).emit('new_order', orderPayload);
+  io?.to('kitchen').emit('new_order', { ...orderPayload, items: order.items });
+
+  // Confirmation email (fire-and-forget)
+  if (input.customerId) {
+    User.findById(input.customerId)
+      .select('name email')
+      .then(user => {
+        if (user) {
+          sendMail({
+            to: user.email,
+            subject: `Order Confirmed — ${order.orderNumber}`,
+            html: emailTemplates.orderConfirmation(user.name, order.orderNumber, `₹${total.toFixed(2)}`),
+          }).catch(e => logger.warn('Order email failed', { e }));
+        }
+      })
+      .catch(() => {});
+  }
+
+  await cache.delPattern(`orders:${input.restaurantId}:*`);
+  return order;
+}
+
+// ─── Customer order history ───────────────────────────────────
+export async function getMyOrders(customerId: string, query: Record<string, string>) {
+  const { page, limit, skip } = parsePagination(query);
+  const filter: Record<string, unknown> = { customerId: new mongoose.Types.ObjectId(customerId) };
+  if (query.status) filter.status = query.status;
+
+  const [data, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('tableId', 'tableNumber section')
+      .lean(),
+    Order.countDocuments(filter),
+  ]);
+
+  return { data, pagination: buildMeta(total, page, limit) };
+}
+
+// ─── All orders for a restaurant ─────────────────────────────
+export async function getRestaurantOrders(restaurantId: string, query: Record<string, string>) {
+  const cacheKey = `orders:${restaurantId}:${JSON.stringify(query)}`;
+  const cached = await cache.get<{ data: unknown[]; pagination: unknown }>(cacheKey);
+  if (cached) return cached;
+
+  const { page, limit, skip } = parsePagination(query);
+  const filter: Record<string, unknown> = { restaurantId: new mongoose.Types.ObjectId(restaurantId) };
+  if (query.status) filter.status = query.status;
+  if (query.paymentStatus) filter.paymentStatus = query.paymentStatus;
+  if (query.type) filter.type = query.type;
+
+  const [data, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('customerId', 'name email phone')
+      .populate('tableId', 'tableNumber section')
+      .lean(),
+    Order.countDocuments(filter),
+  ]);
+
+  const result = { data, pagination: buildMeta(total, page, limit) };
+  await cache.set(cacheKey, result, 30);
+  return result;
+}
+
+// ─── Single order ─────────────────────────────────────────────
+export async function getOrderById(
+  id: string,
+  user: { userId: string; role: string }
+): Promise<IOrderDocument> {
+  const order = await Order.findById(id)
+    .populate('customerId', 'name email phone')
+    .populate('tableId', 'tableNumber section');
+  if (!order) throw new AppError('Order not found', 404);
+
+  // Customers can only see their own orders
+  if (user.role === 'customer' && order.customerId?.toString() !== user.userId) {
+    throw new AppError('Access denied', 403);
+  }
+  return order;
+}
+
+// ─── Live orders (kitchen dashboard) ─────────────────────────
+export async function getLiveOrders(restaurantId: string) {
+  return Order.find({
+    restaurantId,
+    status: { $in: ['pending', 'confirmed', 'preparing', 'ready'] },
+  })
+    .sort({ createdAt: 1 })
+    .populate('tableId', 'tableNumber section')
+    .lean();
+}
+
+// ─── Update order status ──────────────────────────────────────
+export async function updateStatus(
+  id: string,
+  newStatus: OrderStatus,
+  userId: string
+): Promise<IOrderDocument> {
+  const order = await Order.findById(id);
+  if (!order) throw new AppError('Order not found', 404);
+
+  const allowed = VALID_TRANSITIONS[order.status];
+  if (allowed && !allowed.includes(newStatus)) {
+    throw new AppError(
+      `Cannot transition from '${order.status}' to '${newStatus}'`,
+      400,
+      'INVALID_TRANSITION'
+    );
+  }
+
+  // Sync kitchenStatus
+  const kitchenStatusMap: Partial<Record<OrderStatus, string>> = {
+    confirmed: 'acknowledged',
+    preparing: 'preparing',
+    ready: 'done',
+  };
+  const kitchenStatus = kitchenStatusMap[newStatus];
+
+  const updated = await Order.findByIdAndUpdate(
+    id,
+    { status: newStatus, ...(kitchenStatus && { kitchenStatus }) },
+    { new: true }
+  ).populate('tableId', 'tableNumber section');
+
+  if (!updated) throw new AppError('Order not found', 404);
+
+  const io = getIO();
+  io?.to(`restaurant:${order.restaurantId}`).emit('order_status_updated', {
+    orderId: id,
+    orderNumber: order.orderNumber,
+    status: newStatus,
+    updatedBy: userId,
+  });
+  if (order.customerId) {
+    io?.to(`user:${order.customerId}`).emit('order_status_updated', {
+      orderId: id,
+      orderNumber: order.orderNumber,
+      status: newStatus,
+    });
+  }
+
+  await cache.delPattern(`orders:${order.restaurantId}:*`);
+  return updated;
+}
+
+// ─── Cancel order ─────────────────────────────────────────────
+export async function cancelOrder(
+  id: string,
+  userId: string,
+  role: string
+): Promise<IOrderDocument> {
+  const order = await Order.findById(id);
+  if (!order) throw new AppError('Order not found', 404);
+
+  // Customers can only cancel their own orders
+  if (role === 'customer' && order.customerId?.toString() !== userId) {
+    throw new AppError('Access denied', 403);
+  }
+  if (role === 'customer' && order.status !== 'pending') {
+    throw new AppError('Order can only be cancelled while pending', 400);
+  }
+  if (['delivered', 'cancelled'].includes(order.status)) {
+    throw new AppError(`Order is already ${order.status}`, 400);
+  }
+
+  const updated = await Order.findByIdAndUpdate(
+    id,
+    { status: 'cancelled' },
+    { new: true }
+  );
+
+  const io = getIO();
+  io?.to(`restaurant:${order.restaurantId}`).emit('order_cancelled', {
+    orderId: id,
+    orderNumber: order.orderNumber,
+  });
+  if (order.customerId) {
+    io?.to(`user:${order.customerId}`).emit('order_cancelled', {
+      orderId: id,
+      orderNumber: order.orderNumber,
+    });
+  }
+
+  await cache.delPattern(`orders:${order.restaurantId}:*`);
+  return updated!;
+}
+
+// ─── Backward-compat class API (used by old order.controller) ─
+export class OrderService {
+  static async create(data: CreateOrderInput & { restaurantId: string }) {
+    return createOrder(data);
+  }
   static async findByRestaurant(restaurantId: string, query: Record<string, string>) {
-    const { page, limit, skip, sort } = parsePagination(query);
-    const filter: Record<string, unknown> = { restaurant: restaurantId };
-    if (query.status) filter.status = query.status;
-    if (query.type) filter.type = query.type;
-    if (query.date) {
-      const d = new Date(query.date);
-      filter.placedAt = { $gte: d, $lt: new Date(d.getTime() + 86400000) };
-    }
-
-    const [data, total] = await Promise.all([
-      Order.find(filter).sort(sort).skip(skip).limit(limit).populate('table', 'number').populate('customer', 'name email'),
-      Order.countDocuments(filter),
-    ]);
-
-    return { data, pagination: buildMeta(total, page, limit) } as PaginatedResult<IOrderDocument>;
+    return getRestaurantOrders(restaurantId, query);
   }
-
-  // ─── Find by ID ───────────────────────────────────────────────
-  static async findById(orderId: string) {
-    const order = await Order.findById(orderId)
-      .populate('table', 'number section')
-      .populate('customer', 'name email phone')
-      .populate('items.menuItem', 'name images');
-    if (!order) throw new AppError('Order not found', 404);
-    return order;
+  static async findById(id: string) {
+    return Order.findById(id)
+      .populate('customerId', 'name email phone')
+      .populate('tableId', 'tableNumber section');
   }
-
-  // ─── Cancel ──────────────────────────────────────────────────
-  static async cancel(orderId: string, reason: string, userId: string) {
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError('Order not found', 404);
-    if (['completed', 'cancelled', 'refunded'].includes(order.status)) {
-      throw new AppError('Order cannot be cancelled', 400);
-    }
-    order.status = 'cancelled';
-    order.cancelledAt = new Date();
-    order.cancellationReason = reason;
-    await order.save();
-
-    getIO()?.to('kitchen').emit('orderCancelled', { orderId });
-    return order;
+  static async updateStatus(id: string, status: string, userId: string) {
+    return updateStatus(id, status as OrderStatus, userId);
+  }
+  static async cancel(id: string, _reason: string, userId: string) {
+    return cancelOrder(id, userId, 'customer');
   }
 }

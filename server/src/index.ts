@@ -25,7 +25,16 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined', { stream: morganStream }));
 app.use(cors({ origin: [env.clientUrl, env.adminUrl], credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+
+// Stripe webhook needs raw Buffer — must come before express.json()
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/v1/payments/webhook') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    express.json({ limit: '10mb' })(req, res, next);
+  }
+});
+
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize());
