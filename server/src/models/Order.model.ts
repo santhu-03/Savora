@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IOrder, OrderStatus, OrderType, PaymentStatus, PaymentMethod, ItemStatus } from '../types';
 
 export interface IOrderDocument extends Omit<IOrder, '_id'>, Document {}
@@ -99,4 +99,4 @@ orderSchema.pre('validate', function (next) {
   next();
 });
 
-export const Order = mongoose.model<IOrderDocument, IOrderModel>('Order', orderSchema);
+export const Order = (mongoose.models['Order'] as IOrderModel) || mongoose.model<IOrderDocument, IOrderModel>('Order', orderSchema);

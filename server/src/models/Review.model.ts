@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IReview, ReviewSentiment, ReviewSource } from '../types';
 
 export interface IReviewDocument extends Omit<IReview, '_id'>, Document {}
@@ -38,4 +38,4 @@ const reviewSchema = new Schema(
 reviewSchema.index({ restaurant: 1, isPublished: 1, createdAt: -1 });
 reviewSchema.index({ customer: 1, restaurant: 1 }, { unique: true });
 
-export const Review = mongoose.model<IReviewDocument, IReviewModel>('Review', reviewSchema);
+export const Review = (mongoose.models['Review'] as IReviewModel) || mongoose.model<IReviewDocument, IReviewModel>('Review', reviewSchema);

@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { INotification, NotificationType, NotificationChannel, NotificationStatus, NotificationPriority } from '../types';
 
 export interface INotificationDocument extends Omit<INotification, '_id'>, Document {}
@@ -34,4 +34,4 @@ const notificationSchema = new Schema(
 notificationSchema.index({ recipient: 1, status: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, readAt: 1 });
 
-export const Notification = mongoose.model<INotificationDocument, INotificationModel>('Notification', notificationSchema);
+export const Notification = (mongoose.models['Notification'] as INotificationModel) || mongoose.model<INotificationDocument, INotificationModel>('Notification', notificationSchema);

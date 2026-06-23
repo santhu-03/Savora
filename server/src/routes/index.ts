@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import restaurantRoutes from './restaurant.routes';
+import categoryRoutes from './category.routes';
+import menuItemRoutes from './menuItem.routes';
+import qrMenuRoutes from './qrMenu.routes';
 import menuRoutes from './menu.routes';
 import orderRoutes from './order.routes';
 import reservationRoutes from './reservation.routes';
@@ -17,6 +21,10 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/restaurants', restaurantRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/menu-items', menuItemRoutes);
+router.use('/qr-menu', qrMenuRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/notifications', notificationRoutes);
 

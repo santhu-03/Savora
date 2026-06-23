@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IRestaurant, DayOfWeek } from '../types';
 
 export interface IRestaurantDocument extends Omit<IRestaurant, '_id'>, Document {}
@@ -70,4 +70,4 @@ const restaurantSchema = new Schema(
   { timestamps: true }
 );
 
-export const Restaurant = mongoose.model<IRestaurantDocument, IRestaurantModel>('Restaurant', restaurantSchema);
+export const Restaurant = (mongoose.models['Restaurant'] as IRestaurantModel) || mongoose.model<IRestaurantDocument, IRestaurantModel>('Restaurant', restaurantSchema);

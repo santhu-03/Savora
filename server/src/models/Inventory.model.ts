@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IInventory, InventoryUnit, InventoryStatus, InventoryTransactionType } from '../types';
 
 export interface IInventoryDocument extends Omit<IInventory, '_id'>, Document {}
@@ -64,4 +64,4 @@ inventorySchema.pre('save', function (this: IInventoryDocument, next) {
   next();
 });
 
-export const Inventory = mongoose.model<IInventoryDocument, IInventoryModel>('Inventory', inventorySchema);
+export const Inventory = (mongoose.models['Inventory'] as IInventoryModel) || mongoose.model<IInventoryDocument, IInventoryModel>('Inventory', inventorySchema);

@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IReservation, ReservationStatus, ReservationSource, OccasionType } from '../types';
 
 export interface IReservationDocument extends Omit<IReservation, '_id'>, Document {}
@@ -60,4 +60,4 @@ reservationSchema.pre('validate', function (next) {
   next();
 });
 
-export const Reservation = mongoose.model<IReservationDocument, IReservationModel>('Reservation', reservationSchema);
+export const Reservation = (mongoose.models['Reservation'] as IReservationModel) || mongoose.model<IReservationDocument, IReservationModel>('Reservation', reservationSchema);

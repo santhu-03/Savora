@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IMenuItem, DietaryTag, Allergen, SpiceLevel } from '../types';
 
 export interface IMenuItemDocument extends Omit<IMenuItem, '_id'>, Document {}
@@ -83,4 +83,4 @@ menuItemSchema.pre('validate', function (next) {
   next();
 });
 
-export const MenuItem = mongoose.model<IMenuItemDocument, IMenuItemModel>('MenuItem', menuItemSchema);
+export const MenuItem = (mongoose.models['MenuItem'] as IMenuItemModel) || mongoose.model<IMenuItemDocument, IMenuItemModel>('MenuItem', menuItemSchema);

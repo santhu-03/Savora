@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { IUser, UserRole, UserStatus, LoyaltyTier } from '../types';
@@ -93,4 +93,4 @@ userSchema.methods.generatePasswordResetToken = function (): string {
   return token;
 };
 
-export const User = mongoose.model<IUserDocument, IUserModel>('User', userSchema);
+export const User = (mongoose.models['User'] as IUserModel) || mongoose.model<IUserDocument, IUserModel>('User', userSchema);

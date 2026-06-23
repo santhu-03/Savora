@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { ITable, TableStatus, TableShape, TableFeature } from '../types';
 
 export interface ITableDocument extends Omit<ITable, '_id'>, Document {}
@@ -33,4 +33,4 @@ const tableSchema = new Schema(
 tableSchema.index({ restaurant: 1, number: 1 }, { unique: true });
 tableSchema.index({ restaurant: 1, status: 1 });
 
-export const Table = mongoose.model<ITableDocument, ITableModel>('Table', tableSchema);
+export const Table = (mongoose.models['Table'] as ITableModel) || mongoose.model<ITableDocument, ITableModel>('Table', tableSchema);

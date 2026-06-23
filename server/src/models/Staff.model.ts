@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+﻿import mongoose, { Document, Schema, Model } from 'mongoose';
 import { IStaff, StaffRole, ShiftType } from '../types';
 
 export interface IStaffDocument extends Omit<IStaff, '_id'>, Document {}
@@ -65,4 +65,4 @@ const staffSchema = new Schema(
 staffSchema.index({ restaurant: 1, employeeId: 1 }, { unique: true });
 staffSchema.index({ restaurant: 1, role: 1, isActive: 1 });
 
-export const Staff = mongoose.model<IStaffDocument, IStaffModel>('Staff', staffSchema);
+export const Staff = (mongoose.models['Staff'] as IStaffModel) || mongoose.model<IStaffDocument, IStaffModel>('Staff', staffSchema);
