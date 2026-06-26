@@ -158,13 +158,17 @@ export async function createReservation(
 
   // Socket notification to restaurant
   const io = getIO();
-  io?.to(`restaurant:${restaurantId}`).emit('new_reservation', {
-    reservationId: reservation._id,
-    confirmationCode: reservation.confirmationCode,
-    date: date.toISOString(),
+  const customer = await User.findById(customerId).select('name email').lean();
+  io?.to(`restaurant:${restaurantId}`).emit('reservation_created', {
+    reservationId:   reservation._id.toString(),
+    customerName:    (customer as any)?.name ?? 'Guest',
+    customerEmail:   (customer as any)?.email ?? '',
+    date:            date.toISOString(),
     timeSlot,
     partySize,
-    tableNumber: table.tableNumber,
+    specialRequests,
+    confirmationCode: reservation.confirmationCode,
+    tableNumber:     table.tableNumber,
   });
 
   // Confirmation email
@@ -250,9 +254,27 @@ export async function confirmReservation(id: string): Promise<IReservationDocume
     id,
     { status: 'confirmed' },
     { new: true }
-  );
+  ).populate('tableId', 'tableNumber');
   if (!r) throw new AppError('Reservation not found', 404);
-  if (r.status !== 'confirmed') throw new AppError('Reservation cannot be confirmed', 400);
+
+  // Notify the customer
+  const io = getIO();
+  if (r.customerId) {
+    io?.to(`user:${r.customerId}`).emit('reservation_confirmed', {
+      reservationId:    id,
+      restaurantId:     r.restaurantId.toString(),
+      date:             r.date.toISOString(),
+      timeSlot:         r.timeSlot,
+      tableNumber:      (r.tableId as any)?.tableNumber,
+      confirmationCode: r.confirmationCode,
+    });
+  }
+  io?.to(`restaurant:${r.restaurantId}`).emit('reservation_status_changed', {
+    reservationId: id,
+    status:        'confirmed',
+    tableNumber:   (r.tableId as any)?.tableNumber,
+  });
+
   return r;
 }
 
@@ -265,7 +287,7 @@ export async function updateStatus(
   if (!r) throw new AppError('Reservation not found', 404);
 
   const io = getIO();
-  io?.to(`restaurant:${r.restaurantId}`).emit('reservation_updated', {
+  io?.to(`restaurant:${r.restaurantId}`).emit('reservation_status_changed', {
     reservationId: id,
     status,
   });

@@ -30,44 +30,6 @@ export function initSocket(httpServer: HttpServer): SocketServer {
     }
   });
 
-  io.on('connection', (socket: Socket) => {
-    const user = socket.data.user;
-    logger.debug('Socket connected', { socketId: socket.id, userId: user?.userId });
-
-    // Join user-specific room
-    if (user?.userId) socket.join(`user:${user.userId}`);
-
-    socket.on('join:restaurant', (restaurantId: string) => {
-      socket.join(`restaurant:${restaurantId}`);
-    });
-
-    socket.on('join:kitchen', () => {
-      if (!user) return socket.emit('error', { message: 'Unauthorized' });
-      socket.join('kitchen');
-    });
-
-    socket.on('join:tables', () => {
-      if (!user) return socket.emit('error', { message: 'Unauthorized' });
-      socket.join('tables');
-    });
-
-    socket.on('join:waitstaff', () => {
-      if (!user) return socket.emit('error', { message: 'Unauthorized' });
-      socket.join('waitstaff');
-    });
-
-    socket.on('join:admin', () => {
-      if (!user || !['admin', 'manager', 'super_admin'].includes(user.role)) {
-        return socket.emit('error', { message: 'Unauthorized' });
-      }
-      socket.join('admin');
-    });
-
-    socket.on('disconnect', reason => {
-      logger.debug('Socket disconnected', { socketId: socket.id, reason });
-    });
-  });
-
   logger.info('Socket.io initialized');
   return io;
 }

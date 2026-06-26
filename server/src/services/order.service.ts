@@ -138,14 +138,24 @@ export async function createOrder(input: CreateOrderInput): Promise<IOrderDocume
   // Socket events
   const io = getIO();
   const orderPayload = {
-    orderId: order._id,
+    orderId:     order._id.toString(),
     orderNumber: order.orderNumber,
-    type: order.type,
+    type:        order.type,
     total,
-    itemCount: pricedItems.length,
+    itemCount:   pricedItems.length,
+    tableId:     input.tableId,
+    notes:       input.notes,
+    createdAt:   order.createdAt.toISOString(),
+    items: pricedItems.map(i => ({
+      id:                  i.menuItemId.toString(),
+      name:                i.name,
+      quantity:            i.quantity,
+      status:              i.status,
+      specialInstructions: i.specialInstructions,
+    })),
   };
   io?.to(`restaurant:${input.restaurantId}`).emit('new_order', orderPayload);
-  io?.to('kitchen').emit('new_order', { ...orderPayload, items: order.items });
+  io?.to(`kitchen:${input.restaurantId}`)   .emit('new_order', orderPayload);
 
   // Confirmation email (fire-and-forget)
   if (input.customerId) {
@@ -277,17 +287,19 @@ export async function updateStatus(
   if (!updated) throw new AppError('Order not found', 404);
 
   const io = getIO();
-  io?.to(`restaurant:${order.restaurantId}`).emit('order_status_updated', {
-    orderId: id,
+  const statusPayload = {
+    orderId:     id,
     orderNumber: order.orderNumber,
-    status: newStatus,
-    updatedBy: userId,
-  });
+    status:      newStatus,
+    updatedBy:   userId,
+  };
+  io?.to(`restaurant:${order.restaurantId}`).emit('order_status_updated', statusPayload);
+  io?.to(`order:${id}`)                     .emit('order_status_updated', statusPayload);
   if (order.customerId) {
     io?.to(`user:${order.customerId}`).emit('order_status_updated', {
-      orderId: id,
+      orderId:     id,
       orderNumber: order.orderNumber,
-      status: newStatus,
+      status:      newStatus,
     });
   }
 

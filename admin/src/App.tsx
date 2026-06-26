@@ -1,144 +1,77 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sidebar } from './components/Sidebar';
-import { Topbar } from './components/Topbar';
-import { CommandPalette } from './components/CommandPalette';
-import { Dashboard } from './pages/Dashboard';
+import { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
+import { DashboardLayout } from './layouts/DashboardLayout';
 
-// ─── Placeholder page ─────────────────────────────────────────
-function PlaceholderPage({ title, description }: { title: string; description: string }) {
+// ─── Lazy pages ───────────────────────────────────────────────
+const Overview       = lazy(() => import('./pages/Overview').then(m => ({ default: m.Overview })));
+const Orders         = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
+const Kitchen        = lazy(() => import('./pages/Kitchen').then(m => ({ default: m.Kitchen })));
+const Reservations   = lazy(() => import('./pages/Reservations').then(m => ({ default: m.Reservations })));
+const MenuManagement = lazy(() => import('./pages/MenuManagement').then(m => ({ default: m.MenuManagement })));
+const Tables         = lazy(() => import('./pages/Tables').then(m => ({ default: m.Tables })));
+const Inventory      = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const Staff          = lazy(() => import('./pages/Staff').then(m => ({ default: m.Staff })));
+const Customers      = lazy(() => import('./pages/Customers').then(m => ({ default: m.Customers })));
+const Loyalty        = lazy(() => import('./pages/Loyalty').then(m => ({ default: m.Loyalty })));
+const Analytics      = lazy(() => import('./pages/Analytics').then(m => ({ default: m.Analytics })));
+const Reviews        = lazy(() => import('./pages/Reviews').then(m => ({ default: m.Reviews })));
+const Payments       = lazy(() => import('./pages/Payments').then(m => ({ default: m.Payments })));
+const Settings       = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+
+// ─── Page loader ─────────────────────────────────────────────
+function PageLoader() {
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="text-center max-w-sm"
-      >
-        <div className="w-14 h-14 rounded-2xl bg-gold/[0.08] border border-gold/[0.12] flex items-center justify-center mx-auto mb-6">
-          <span className="text-2xl">◈</span>
-        </div>
-        <h2 className="font-display text-3xl text-off-white mb-2">{title}</h2>
-        <p className="font-body text-sm text-off-white/30 leading-relaxed">{description}</p>
-        <button className="btn-primary mt-6 text-xs">Coming Soon</button>
-      </motion.div>
+    <div className="h-full flex items-center justify-center p-8">
+      <div className="flex flex-col items-center gap-3">
+        <div
+          className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: 'rgba(191,139,94,0.2)', borderTopColor: '#BF8B5E' }}
+        />
+        <span className="font-body text-xs text-charcoal/30">Loading…</span>
+      </div>
     </div>
   );
 }
 
 // ─── App ─────────────────────────────────────────────────────
 export default function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [commandOpen, setCommandOpen] = useState(false);
-
-  // Ctrl/Cmd + K → command palette
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setCommandOpen(o => !o);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
+  // Ctrl/Cmd+K is handled inside DashboardLayout
   return (
-    <div className="flex h-screen bg-dark overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(o => !o)}
+    <AuthProvider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#fff',
+            color: '#1a1a1a',
+            border: '1px solid rgba(0,0,0,0.08)',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '13px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+          },
+        }}
       />
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar onOpenCommand={() => setCommandOpen(true)} />
-
-        {/* Page area */}
-        <main className="flex-1 overflow-hidden relative">
-          {/* Ambient background */}
-          <div
-            className="absolute top-0 right-0 w-[600px] h-[400px] pointer-events-none"
-            style={{
-              background: 'radial-gradient(ellipse at top right, rgba(200,155,60,0.04) 0%, transparent 70%)',
-            }}
-          />
-
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route
-                path="/orders"
-                element={
-                  <PlaceholderPage
-                    title="Orders"
-                    description="Full order management with live updates, kitchen routing, and payment processing."
-                  />
-                }
-              />
-              <Route
-                path="/kitchen"
-                element={
-                  <PlaceholderPage
-                    title="Kitchen Display"
-                    description="Real-time kitchen queue with preparation timers and chef station assignments."
-                  />
-                }
-              />
-              <Route
-                path="/reservations"
-                element={
-                  <PlaceholderPage
-                    title="Reservations"
-                    description="Interactive floor plan with live occupancy, timeline view, and automated reminders."
-                  />
-                }
-              />
-              <Route
-                path="/menu"
-                element={
-                  <PlaceholderPage
-                    title="Menu Management"
-                    description="Manage dishes, pricing, availability, dietary tags, and seasonal specials."
-                  />
-                }
-              />
-              <Route
-                path="/customers"
-                element={
-                  <PlaceholderPage
-                    title="Customers"
-                    description="Guest profiles, dining history, preferences, and loyalty tracking."
-                  />
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <PlaceholderPage
-                    title="Analytics"
-                    description="Revenue trends, peak-hour heatmaps, inventory forecasting, and staff performance."
-                  />
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <PlaceholderPage
-                    title="Settings"
-                    description="Restaurant profile, themes, integrations, and team permissions."
-                  />
-                }
-              />
-            </Routes>
-          </AnimatePresence>
-        </main>
-      </div>
-
-      {/* Command Palette */}
-      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
-    </div>
+      <Routes>
+        <Route element={<DashboardLayout />}>
+          <Route index element={<Suspense fallback={<PageLoader />}><Overview /></Suspense>} />
+          <Route path="orders"       element={<Suspense fallback={<PageLoader />}><Orders /></Suspense>} />
+          <Route path="kitchen"      element={<Suspense fallback={<PageLoader />}><Kitchen /></Suspense>} />
+          <Route path="reservations" element={<Suspense fallback={<PageLoader />}><Reservations /></Suspense>} />
+          <Route path="menu"         element={<Suspense fallback={<PageLoader />}><MenuManagement /></Suspense>} />
+          <Route path="tables"       element={<Suspense fallback={<PageLoader />}><Tables /></Suspense>} />
+          <Route path="inventory"    element={<Suspense fallback={<PageLoader />}><Inventory /></Suspense>} />
+          <Route path="staff"        element={<Suspense fallback={<PageLoader />}><Staff /></Suspense>} />
+          <Route path="customers"    element={<Suspense fallback={<PageLoader />}><Customers /></Suspense>} />
+          <Route path="loyalty"      element={<Suspense fallback={<PageLoader />}><Loyalty /></Suspense>} />
+          <Route path="analytics"    element={<Suspense fallback={<PageLoader />}><Analytics /></Suspense>} />
+          <Route path="reviews"      element={<Suspense fallback={<PageLoader />}><Reviews /></Suspense>} />
+          <Route path="payments"     element={<Suspense fallback={<PageLoader />}><Payments /></Suspense>} />
+          <Route path="settings"     element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+          <Route path="*"            element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
   );
 }

@@ -4,8 +4,13 @@
 
 @layer base {
   :root {
-    --gold: #C89B3C;
-    --gold-light: #D4AE5A;
+    --primary: #260B10;
+    --primary-light: #3d1219;
+    --gold: #BF8B5E;
+    --gold-light: #D9B89C;
+    --cream: #FDF8F3;
+    --charcoal: #1a1a1a;
+    /* kept for dark overlays */
     --dark: #111111;
     --surface: #1B1B1B;
     --off-white: #F7F5F2;
@@ -13,12 +18,11 @@
   }
 
   *, *::before, *::after { box-sizing: border-box; }
-
   html { -webkit-text-size-adjust: 100%; }
 
   body {
-    background-color: #111111;
-    color: #F7F5F2;
+    background-color: var(--cream);
+    color: var(--charcoal);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
@@ -27,51 +31,42 @@
 
   #root { height: 100vh; overflow: hidden; }
 
-  ::selection { background: rgba(200,155,60,0.2); color: #F7F5F2; }
+  ::selection { background: rgba(191,139,94,0.2); color: var(--charcoal); }
 
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(200,155,60,0.3); }
+  ::-webkit-scrollbar-thumb { background: rgba(38,11,16,0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(191,139,94,0.4); }
 }
 
 @layer components {
-  /* Gold gradient text */
-  .text-gradient {
-    background: linear-gradient(135deg, #C89B3C 0%, #D4AE5A 50%, #9A7628 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Glass effect */
-  .glass {
-    background: rgba(17, 17, 17, 0.8);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-
-  /* Sidebar navigation link */
+  /* ── Sidebar nav link ─────────────────────────────── */
   .nav-link {
     @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl
-           font-body text-sm text-off-white/40
+           font-body text-sm text-white/50
            transition-colors duration-150
-           hover:text-off-white/80 hover:bg-white/[0.04];
+           hover:text-white hover:bg-primary-hover;
   }
-
   .nav-link.active {
-    @apply text-gold;
+    @apply text-white bg-gold;
+  }
+  .nav-link-collapsed {
+    @apply relative flex items-center justify-center w-10 h-10 rounded-xl
+           text-white/50 transition-colors duration-150
+           hover:text-white hover:bg-primary-hover;
+  }
+  .nav-link-collapsed.active {
+    @apply text-white bg-gold;
   }
 
-  /* Dashboard stat card */
+  /* ── Dashboard stat card (cream content area) ─────── */
   .stat-card {
-    @apply bg-surface border border-white/[0.05] rounded-2xl p-5
-           transition-all duration-300 cursor-default
-           hover:border-gold/15 hover:-translate-y-0.5;
+    @apply bg-white border border-black/[0.06] rounded-2xl p-5
+           shadow-card transition-all duration-300
+           hover:shadow-card-hover hover:-translate-y-0.5;
   }
 
-  /* Data table */
+  /* ── Data table ───────────────────────────────────── */
   .table-container {
     @apply w-full overflow-x-auto no-scrollbar;
   }
@@ -81,77 +76,120 @@
   }
 
   table.premium thead th {
-    @apply text-left text-off-white/30 font-body text-xs font-medium
+    @apply text-left text-charcoal/40 font-body text-xs font-medium
            uppercase tracking-widest px-4 py-3
-           border-b border-white/[0.05];
+           border-b border-black/[0.06];
   }
 
   table.premium tbody tr {
-    @apply border-b border-white/[0.04] transition-colors duration-100
-           hover:bg-white/[0.025];
+    @apply border-b border-black/[0.04] transition-colors duration-100
+           hover:bg-black/[0.015];
   }
 
   table.premium tbody td {
-    @apply px-4 py-3.5 font-body text-sm text-off-white/70;
+    @apply px-4 py-3.5 font-body text-sm text-charcoal/70;
   }
 
-  /* Status badge */
+  /* ── Status badges ────────────────────────────────── */
   .badge {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
            font-body text-xs font-medium;
   }
+  .badge-pending    { @apply bg-amber-50 text-amber-600 border border-amber-200; }
+  .badge-preparing  { @apply bg-blue-50 text-blue-600 border border-blue-200; }
+  .badge-ready      { @apply bg-emerald-50 text-emerald-600 border border-emerald-200; }
+  .badge-served     { @apply bg-black/[0.04] text-charcoal/40 border border-black/[0.08]; }
+  .badge-cancelled  { @apply bg-red-50 text-red-600 border border-red-200; }
+  .badge-confirmed  { @apply bg-emerald-50 text-emerald-600 border border-emerald-200; }
 
-  .badge-pending  { @apply bg-amber-500/10 text-amber-400; }
-  .badge-preparing { @apply bg-blue-500/10 text-blue-400; }
-  .badge-ready    { @apply bg-emerald-500/10 text-emerald-400; }
-  .badge-served   { @apply bg-white/[0.06] text-off-white/40; }
-  .badge-cancelled { @apply bg-red-500/10 text-red-400; }
-  .badge-confirmed { @apply bg-emerald-500/10 text-emerald-400; }
-
-  /* Buttons */
+  /* ── Buttons ──────────────────────────────────────── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2
-           bg-gold text-dark font-body font-semibold text-sm
+           bg-primary text-white font-body font-semibold text-sm
            px-4 py-2 rounded-xl
            transition-all duration-200
-           hover:bg-gold-light hover:shadow-glow
+           hover:bg-primary-light hover:shadow-glow
+           active:scale-[0.97];
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2
+           bg-gold text-white font-body font-semibold text-sm
+           px-4 py-2 rounded-xl
+           transition-all duration-200
+           hover:bg-gold-dark
            active:scale-[0.97];
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2
-           text-off-white/50 font-body text-sm
+           text-charcoal/60 font-body text-sm
            px-4 py-2 rounded-xl
            transition-all duration-150
-           hover:text-off-white hover:bg-white/[0.05]
+           hover:text-charcoal hover:bg-black/[0.05]
            active:scale-[0.97];
   }
 
   .btn-icon {
     @apply w-9 h-9 flex items-center justify-center rounded-xl
-           text-off-white/40 transition-all duration-150
-           hover:text-off-white hover:bg-white/[0.06]
+           text-charcoal/40 transition-all duration-150
+           hover:text-charcoal hover:bg-black/[0.06]
            active:scale-[0.95];
   }
 
-  /* Input */
-  .input {
-    @apply bg-surface-2 border border-white/[0.06] text-off-white
-           rounded-xl px-3.5 py-2.5 font-body text-sm
-           placeholder-off-white/20
-           transition-all duration-150
-           focus:outline-none focus:border-gold/40 focus:bg-surface-3;
+  /* Dark btn-icon for sidebar/topbar dark areas */
+  .btn-icon-dark {
+    @apply w-9 h-9 flex items-center justify-center rounded-xl
+           text-white/40 transition-all duration-150
+           hover:text-white hover:bg-white/[0.08]
+           active:scale-[0.95];
   }
 
-  /* Shimmer skeleton */
+  /* ── Input ────────────────────────────────────────── */
+  .input {
+    @apply bg-white border border-black/[0.1] text-charcoal
+           rounded-xl px-3.5 py-2.5 font-body text-sm
+           placeholder-charcoal/30
+           transition-all duration-150
+           focus:outline-none focus:border-gold/60 focus:ring-2 focus:ring-gold/10;
+  }
+
+  /* ── Glass (for dark overlays like command palette) ── */
+  .glass {
+    background: rgba(17, 17, 17, 0.88);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* ── Gold gradient text ───────────────────────────── */
+  .text-gradient {
+    background: linear-gradient(135deg, #BF8B5E 0%, #D9B89C 50%, #a67748 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Live dot ─────────────────────────────────────── */
+  .live-dot {
+    @apply w-1.5 h-1.5 rounded-full bg-emerald-500;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* ── Skeleton ─────────────────────────────────────── */
   .skeleton {
-    background: linear-gradient(90deg, #1B1B1B 25%, #252525 50%, #1B1B1B 75%);
+    background: linear-gradient(90deg, #f0e8dc 25%, #f8f1e6 50%, #f0e8dc 75%);
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
     border-radius: 8px;
   }
 
-  /* Chart tooltip */
+  /* ── Section label ────────────────────────────────── */
+  .section-label {
+    @apply font-body text-xs text-charcoal/35 uppercase tracking-widest;
+  }
+
+  /* recharts */
   .recharts-tooltip-wrapper { outline: none !important; }
 }
 

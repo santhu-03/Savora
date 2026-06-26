@@ -4,11 +4,29 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Sidebar / brand tokens
+        primary: {
+          DEFAULT: '#260B10',
+          light: '#3d1219',
+          hover: '#4a1720',
+        },
         gold: {
-          DEFAULT: '#C89B3C',
-          light: '#D4AE5A',
+          DEFAULT: '#BF8B5E',
+          light: '#D9B89C',
+          dark: '#a67748',
           dim: '#9A7628',
         },
+        copper: {
+          DEFAULT: '#A6523F',
+          dark: '#733122',
+        },
+        cream: {
+          DEFAULT: '#FDF8F3',
+          2: '#F5EDE0',
+          3: '#EDE0CE',
+        },
+        charcoal: '#1a1a1a',
+        // Dark panel tokens (kept for glass overlays / command palette)
         dark: '#111111',
         surface: {
           DEFAULT: '#1B1B1B',
@@ -32,12 +50,17 @@ export default {
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
+      width: {
+        sidebar: '280px',
+        'sidebar-collapsed': '72px',
+      },
       boxShadow: {
-        'gold-ring': '0 0 0 1px rgba(200,155,60,0.3)',
-        'card': '0 2px 8px rgba(0,0,0,0.3)',
-        'card-hover': '0 8px 32px rgba(0,0,0,0.5)',
-        'glow': '0 0 24px rgba(200,155,60,0.18)',
-        'glass': '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+        'gold-ring': '0 0 0 1px rgba(191,139,94,0.3)',
+        card: '0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06)',
+        'card-hover': '0 4px 24px rgba(0,0,0,0.12)',
+        glow: '0 0 24px rgba(191,139,94,0.2)',
+        glass: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+        sidebar: '4px 0 24px rgba(0,0,0,0.2)',
       },
       keyframes: {
         shimmer: {

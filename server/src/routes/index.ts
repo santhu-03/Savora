@@ -11,8 +11,13 @@ import menuRoutes from './menu.routes';
 import tableRoutes from './table.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
+import analyticsV2Routes from './analytics.v2.routes';
 import inventoryRoutes from './inventory.routes';
+import inventoryV2Routes from './inventory.v2.routes';
 import notificationRoutes from './notification.routes';
+import kitchenRoutes from './kitchen.routes';
+import staffRoutes from './staff.routes';
+import loyaltyRoutes from './loyalty.routes';
 
 const router = Router();
 
@@ -30,6 +35,13 @@ router.use('/orders', ordersRoutes);
 router.use('/reservations', reservationsRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/notifications', notificationRoutes);
+
+// Operational routes
+router.use('/kitchen', kitchenRoutes);
+router.use('/staff', staffRoutes);
+router.use('/loyalty', loyaltyRoutes);
+router.use('/inventory', inventoryV2Routes);
+router.use('/analytics', analyticsV2Routes);
 
 // Restaurant-scoped sub-resource routes
 const rid = ':restaurantId';

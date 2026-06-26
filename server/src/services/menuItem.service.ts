@@ -150,6 +150,10 @@ export async function toggleAvailability(id: string, restaurantId: string): Prom
 
 // ─── QR menu (full public menu + table context) ───────────────
 export async function getQrMenu(tableId: string) {
+  const cacheKey = `qr-menu:${tableId}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
   const table = await Table.findById(tableId);
   if (!table) throw new AppError('Table not found', 404);
 
@@ -164,13 +168,30 @@ export async function getQrMenu(tableId: string) {
   if (!restaurant) throw new AppError('Restaurant not found', 404);
 
   const menu = categories.map(cat => ({
-    category: cat,
-    items: items.filter(i => i.category?.toString() === cat._id.toString()),
+    category: { _id: cat._id, name: cat.name, description: (cat as any).description, sortOrder: (cat as any).sortOrder },
+    items: items
+      .filter(i => i.category?.toString() === cat._id.toString())
+      .map(i => ({
+        _id:           i._id,
+        name:          i.name,
+        description:   i.description,
+        price:         i.price,
+        discountPrice: i.discountPrice,
+        images:        i.images,
+        dietary:       i.dietary,
+        allergens:     i.allergens,
+        prepTime:      i.prepTime,
+        isFeatured:    i.isFeatured,
+        isAvailable:   i.isAvailable,
+      })),
   }));
 
-  return {
-    table: { id: table._id, tableNumber: table.tableNumber, capacity: table.capacity, section: table.section },
-    restaurant,
+  const result = {
+    table:      { id: table._id, tableNumber: table.tableNumber, capacity: table.capacity, section: table.section },
+    restaurant: { _id: restaurant._id, name: restaurant.name, logo: restaurant.logo, coverImage: restaurant.coverImage, cuisine: restaurant.cuisine, address: restaurant.address, contact: restaurant.contact, rating: (restaurant as any).rating },
     menu,
   };
+
+  await cache.set(cacheKey, result, 120); // 2-minute TTL
+  return result;
 }

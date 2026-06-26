@@ -139,9 +139,10 @@ orderSchema.index({ restaurantId: 1, orderNumber: 1 }, { unique: true });
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ tableId: 1, status: 1 });
 
-// Auto-generate orderNumber per restaurant: REST-YYYYMMDD-XXXX
-orderSchema.pre('save', async function (next) {
-  if (!this.isNew) return next();
+// Auto-generate orderNumber per restaurant: ORD-YYYYMMDD-XXXX
+// Must run in pre('validate') so the required field is set before Mongoose checks it.
+orderSchema.pre('validate', async function (next) {
+  if (!this.isNew || this.orderNumber) return next();
   const today = new Date();
   const prefix = `ORD-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
   const count = await (this.constructor as mongoose.Model<IOrderDocument>).countDocuments({

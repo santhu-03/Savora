@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -27,7 +27,15 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-router", "expo-font", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      ["expo-font", { "fonts": [] }],
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "Allow Savora to scan QR codes at your table." }],
+      ["expo-notifications", { "icon": "./assets/icon.png", "color": "#BF8B5E" }],
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow Savora to show restaurants near you." }],
+      ["@stripe/stripe-react-native", { "merchantIdentifier": "merchant.com.savora.app", "enableGooglePay": true }]
+    ],
     "scheme": "savora",
     "extra": {
       "router": {
